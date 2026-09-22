@@ -1,53 +1,49 @@
-{% extends "bootstrap/base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flasky</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #333; }
 
-{% block title %}Flasky{% endblock %}
+        /* Bootstrap 3 container widths para centralizar igual ao professor */
+        @media (min-width: 768px)  { .container { max-width: 750px !important; } }
+        @media (min-width: 992px)  { .container { max-width: 970px !important; } }
+        @media (min-width: 1200px) { .container { max-width: 1170px !important; } }
 
-{% block head %}
-{{ super() }}
-<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-{% endblock %}
+        .navbar-dark { background-color: #222 !important; }
+        .navbar-brand { color: #9d9d9d !important; font-size: 18px; text-decoration: none; font-weight: normal; }
+        .navbar-brand:hover { color: #fff !important; }
+        .nav-link { color: #9d9d9d !important; font-size: 14px; }
+        .nav-link:hover { color: #fff !important; }
 
-{% block navbar %}
-<div class="navbar navbar-inverse" role="navigation">
-    <div class="container">
-        <div class="navbar-header">
-            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
+        hr { border-top: 1px solid #eee; opacity: 1; }
+        .form-control { border-radius: 4px; border: 1px solid #ccc; height: 34px; padding: 6px 12px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark py-0" style="height: 50px;">
+        <div class="container">
+            <a class="navbar-brand me-4" href="/">Flasky</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
             </button>
-
-            <a class="navbar-brand" href="{{ url_for('index') }}">Avaliação Contínua: <strong>Aula 060</strong></a>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                </ul>
+            </div>
         </div>
+    </nav>
 
-        <div class="navbar-collapse collapse">
-            <ul class="nav navbar-nav">
-                <li>
-                    <a href="{{ url_for('index') }}">Home</a>
-                </li>
-            </ul>
-        </div>
+    <div class="container" style="padding-top: 20px;">
+        {% block content %}{% endblock %}
     </div>
-</div>
-{% endblock %}
 
-{% block content %}
-<div class="container">
-    {% for message in get_flashed_messages() %}
-    <div class="alert alert-warning">
-        <button type="button" class="close" data-dismiss="alert">&times;</button>
-        {{ message }}
-    </div>
-    {% endfor %}
-
-    {% block page_content %}{% endblock %}
-</div>
-{% endblock %}
-
-
-{% block scripts %}
-{{ super() }}
-{{ moment.include_moment() }}
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

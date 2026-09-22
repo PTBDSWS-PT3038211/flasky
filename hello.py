@@ -1,4 +1,5 @@
 import os
+import requests as http_requests
 from flask import Flask, render_template, session, redirect, url_for
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
@@ -7,6 +8,7 @@ from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -20,6 +22,60 @@ bootstrap = Bootstrap(app)
 moment = Moment(app)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+def enviar_email(nome_usuario):
+    """Envia e-mail via SendGrid API para o professor e para o aluno."""
+    try:
+        response = http_requests.post(
+            'https://api.sendgrid.com/v3/mail/send',
+            headers={
+                'Authorization': f'Bearer {SENDGRID_API_KEY}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'personalizations': [
+                    {
+                        'to': [{'email': email} for email in EMAIL_DESTINATARIOS]
+                    }
+                ],
+                'from': {
+                    'email': EMAIL_REMETENTE,
+                    'name': 'Flasky App'
+                },
+                'subject': f'Novo usuário cadastrado - {nome_usuario}',
+                'content': [
+                    {
+                        'type': 'text/html',
+                        'value': f'''
+                            <h2>Novo usuário cadastrado no Flasky</h2>
+                            <p><strong>Prontuário:</strong> {PRONTUARIO}</p>
+                            <p><strong>Nome do aluno:</strong> {NOME_ALUNO}</p>
+                            <hr>
+                            <p><strong>Usuário cadastrado:</strong> {nome_usuario}</p>
+                        '''
+                    }
+                ]
+            }
+        )
+        print(f'E-mail enviado! Status: {response.status_code} - {response.text}')
+        return response.status_code == 202
+    except Exception as e:
+        print(f'Erro ao enviar e-mail: {e}')
+        return False
+
+
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', 'COLE_SUA_CHAVE_AQUI')
+
+# E-mail verificado no SendGrid (Single Sender)
+EMAIL_REMETENTE = ' joshua.m@aluno.ifsp.edu.br'
+
+EMAIL_DESTINATARIOS = [
+    'flaskaulasweb@zohomail.com',
+    'joshua.m@aluno.ifsp.edu.br'
+]
+
+PRONTUARIO = 'PT3038211'
+NOME_ALUNO = 'Joshua Merces'
 
 
 class Role(db.Model):
