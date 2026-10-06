@@ -1,5 +1,6 @@
 import os
-import sys
+from datetime import datetime
+
 import requests as http_requests
 from flask import Flask, render_template, session, redirect, url_for
 from flask_moment import Moment
@@ -8,7 +9,6 @@ from wtforms import StringField, SubmitField, BooleanField
 from wtforms.validators import DataRequired
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -23,21 +23,18 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
-
 EMAIL_REMETENTE = 'joshua.m@aluno.ifsp.edu.br'
-
-
 EMAIL_INSTITUCIONAL = 'joshua.m@aluno.ifsp.edu.br'
-
-
 EMAIL_PROFESSOR = 'flaskaulasweb@zohomail.com'
-
 PRONTUARIO = 'PT3038211'
 NOME_ALUNO = 'Joshua Cassemiro Merces'
 
+ASSUNTO_EMAIL = '[Flasky] Novo usuário'
+
 
 def enviar_email(nome_usuario, enviar_para_professor):
-    """Envia e-mail via SendGrid. Retorna True se aceito (status 202)."""
+    """Envia e-mail via SendGrid e registra no banco.
+    Retorna True se aceito (status 202)."""
     if not SENDGRID_API_KEY:
         print('ERRO: variável de ambiente SENDGRID_API_KEY não definida.')
         return False
@@ -45,6 +42,8 @@ def enviar_email(nome_usuario, enviar_para_professor):
     destinatarios = [EMAIL_INSTITUCIONAL]
     if enviar_para_professor:
         destinatarios.append(EMAIL_PROFESSOR)
+
+    texto = f'Novo usuário cadastrado: {nome_usuario}'
 
     try:
         response = http_requests.post(
@@ -58,7 +57,7 @@ def enviar_email(nome_usuario, enviar_para_professor):
                     {'to': [{'email': e} for e in destinatarios]}
                 ],
                 'from': {'email': EMAIL_REMETENTE, 'name': 'Flasky App'},
-                'subject': f'Novo usuário cadastrado - {nome_usuario}',
+                'subject': ASSUNTO_EMAIL,
                 'content': [
                     {
                         'type': 'text/html',
@@ -75,7 +74,18 @@ def enviar_email(nome_usuario, enviar_para_professor):
             timeout=15,
         )
         print(f'SendGrid -> {response.status_code}: {response.text}')
-        return response.status_code == 202
+
+        aceito = response.status_code == 202
+        if aceito:
+            # Registra o e-mail enviado para aparecer na página /emails
+            db.session.add(EmailEnviado(
+                remetente=nome_usuario,
+                destinatarios=', '.join(destinatarios),
+                assunto=ASSUNTO_EMAIL,
+                texto=texto,
+            ))
+            db.session.commit()
+        return aceito
     except Exception as e:
         print(f'Erro ao enviar e-mail: {e}')
         return False
@@ -101,6 +111,19 @@ class User(db.Model):
         return '<User %r>' % self.username
 
 
+class EmailEnviado(db.Model):
+    __tablename__ = 'emails_enviados'
+    id = db.Column(db.Integer, primary_key=True)
+    remetente = db.Column(db.String(64))        # coluna "De" (usuário cadastrado)
+    destinatarios = db.Column(db.String(256))   # coluna "Para"
+    assunto = db.Column(db.String(128))
+    texto = db.Column(db.String(256))
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return '<EmailEnviado %r>' % self.id
+
+
 class NameForm(FlaskForm):
     name = StringField('Qual é o seu nome?', validators=[DataRequired()])
     enviar_professor = BooleanField(f'Deseja enviar e-mail para {EMAIL_PROFESSOR}?')
@@ -109,7 +132,7 @@ class NameForm(FlaskForm):
 
 @app.shell_context_processor
 def make_shell_context():
-    return dict(db=db, User=User, Role=Role)
+    return dict(db=db, User=User, Role=Role, EmailEnviado=EmailEnviado)
 
 
 @app.errorhandler(404)
@@ -125,21 +148,17 @@ def internal_server_error(e):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form = NameForm()
-
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.name.data).first()
-
         if user is None:
             role = Role.query.filter_by(name='User').first()
             if role is None:
                 role = Role(name='User')
                 db.session.add(role)
                 db.session.commit()
-
             user = User(username=form.name.data, role=role)
             db.session.add(user)
             db.session.commit()
-
             session['known'] = False
             # Novo usuário: dispara o e-mail
             session['email_enviado'] = enviar_email(
@@ -147,12 +166,10 @@ def index():
             )
         else:
             session['known'] = True
-
         session['name'] = form.name.data
         return redirect(url_for('index'))
 
     users = User.query.all()
-
     return render_template(
         'index.html',
         form=form,
@@ -162,3 +179,9 @@ def index():
         email_enviado=session.pop('email_enviado', None),
         users=users,
     )
+
+
+@app.route('/emailsEnviados')
+def emailsEnviados():
+    lista = EmailEnviado.query.order_by(EmailEnviado.enviado_em.desc()).all()
+    return render_template('emailsEnviados.html', emails=lista)
