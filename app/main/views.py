@@ -16,12 +16,13 @@ def index():
             db.session.add(user)
             db.session.commit()
             session['known'] = False
-            print('FLASKY_ADMIN: ' + str(current_app.config['FLASKY_ADMIN']), flush=True)
-            if current_app.config['FLASKY_ADMIN']:
-                #send_email(current_app.config['FLASKY_ADMIN'], 'New User', 'mail/new_user', user=user)
-                print('Enviando mensagem...', flush=True)
-                send_simple_message([current_app.config['FLASKY_ADMIN'], "flaskaulasweb@zohomail.com"], 'Novo usuário', form.name.data)
-                print('Mensagem enviada...', flush=True)
+            # Envia sempre para o e-mail institucional (+ professor)
+            destinatarios = [current_app.config['EMAIL_INSTITUCIONAL'],
+                             current_app.config['EMAIL_PROFESSOR']]
+            print('Enviando mensagem para: ' + str(destinatarios), flush=True)
+            resposta = send_simple_message(destinatarios, 'Novo usuário',
+                                           form.name.data)
+            print('Status SendGrid: ' + str(resposta.status_code), flush=True)
         else:
             session['known'] = True
         session['name'] = form.name.data
