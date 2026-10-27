@@ -12,17 +12,18 @@ class Config:
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     FLASKY_MAIL_SUBJECT_PREFIX = '[Flasky]'
     FLASKY_MAIL_SENDER = 'flaskaulas@zohomail.com'
-    FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN')
+    # E-mail institucional do aluno (recebe a notificação de novo usuário)
+    FLASKY_ADMIN = os.environ.get('FLASKY_ADMIN') or 'joshua.m@aluno.ifsp.edu.br'
+    # E-mail do professor (sempre recebe a notificação)
+    FLASKY_NOTIFY = 'flaskaulasweb@zohomail.com'
+    # Dados do aluno que vão no corpo do e-mail
+    FLASKY_NAME = os.environ.get('FLASKY_NAME') or 'Joshua Cassemiro Merces'
+    FLASKY_PRONTUARIO = os.environ.get('FLASKY_PRONTUARIO') or 'PT3038211'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     API_KEY = os.environ.get('SENDGRID_API_KEY') or os.environ.get('API_KEY')
     API_URL = os.environ.get('API_URL', 'https://api.sendgrid.com/v3/mail/send')
     API_FROM = os.environ.get('API_FROM', 'joshua.m@aluno.ifsp.edu.br')
-
-    EMAIL_INSTITUCIONAL = 'joshua.m@aluno.ifsp.edu.br'
-    EMAIL_PROFESSOR = 'flaskaulasweb@zohomail.com'
-    PRONTUARIO = 'PT3038211'
-    NOME_ALUNO = 'Joshua Cassemiro Merces'
 
     @staticmethod
     def init_app(app):

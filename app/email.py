@@ -4,7 +4,6 @@ from flask_mail import Message
 from . import mail
 
 import requests
-from datetime import datetime
 
 
 def send_async_email(app, msg):
@@ -22,57 +21,44 @@ def send_email(to, subject, template, **kwargs):
     return thr
 
 
-def send_simple_message(to, subject, newUser):
-    """Envia o e-mail de novo usuário via SendGrid.
-    'to' pode ser um e-mail (str) ou uma lista de e-mails.
-    Retorna a resposta da API (status 202 = aceito)."""
+def send_simple_message(to, subject, text):
+    """Envia um e-mail via API do SendGrid. Retorna True se aceito."""
     app = current_app._get_current_object()
+    subject = app.config['FLASKY_MAIL_SUBJECT_PREFIX'] + ' ' + subject
 
-    if isinstance(to, str):
-        to = [to]
+    if not (app.config['API_KEY'] and app.config['API_FROM']):
+        print('ERRO: SendGrid não configurado: defina SENDGRID_API_KEY no WSGI.',
+              flush=True)
+        return False
 
-    assunto = app.config['FLASKY_MAIL_SUBJECT_PREFIX'] + ' ' + subject
-    texto = (
-        'Prontuário: ' + app.config['PRONTUARIO'] + '\n'
-        'Nome do aluno: ' + app.config['NOME_ALUNO'] + '\n'
-        'Novo usuário cadastrado: ' + newUser
-    )
-    html = (
-        '<h2>Novo usuário cadastrado no Flasky</h2>'
-        '<p><strong>Prontuário:</strong> ' + app.config['PRONTUARIO'] + '</p>'
-        '<p><strong>Nome do aluno:</strong> ' + app.config['NOME_ALUNO'] + '</p>'
-        '<hr>'
-        '<p><strong>Usuário cadastrado:</strong> ' + newUser + '</p>'
-    )
+    try:
+        resposta = requests.post(
+            app.config['API_URL'],
+            headers={'Authorization': 'Bearer ' + app.config['API_KEY']},
+            json={'personalizations': [{'to': [{'email': to}]}],
+                  'from': {'email': app.config['API_FROM'], 'name': 'Flasky App'},
+                  'subject': subject,
+                  'content': [{'type': 'text/plain', 'value': text}]},
+            timeout=10)
+    except requests.RequestException as e:
+        print('ERRO: falha ao enviar e-mail para %s: %s' % (to, e), flush=True)
+        return False
 
-    print('Enviando mensagem (POST)...', flush=True)
-    print('URL: ' + str(app.config['API_URL']), flush=True)
-    print('from: ' + str(app.config['API_FROM']), flush=True)
-    print('to: ' + str(to), flush=True)
-    print('subject: ' + assunto, flush=True)
-    print('text: ' + texto, flush=True)
+    if resposta.ok:
+        print('E-mail enviado para %s (%s)' % (to, resposta.status_code), flush=True)
+        return True
+    print('ERRO: SendGrid recusou o envio para %s: %s %s'
+          % (to, resposta.status_code, resposta.text), flush=True)
+    return False
 
-    if not app.config['API_KEY']:
-        print('ERRO: variável de ambiente SENDGRID_API_KEY não definida.', flush=True)
 
-    resposta = requests.post(
-        app.config['API_URL'],
-        headers={
-            'Authorization': 'Bearer ' + str(app.config['API_KEY']),
-            'Content-Type': 'application/json',
-        },
-        json={
-            'personalizations': [{'to': [{'email': e} for e in to]}],
-            'from': {'email': app.config['API_FROM'], 'name': 'Flasky App'},
-            'subject': assunto,
-            'content': [
-                {'type': 'text/plain', 'value': texto},
-                {'type': 'text/html', 'value': html},
-            ],
-        },
-        timeout=15,
-    )
-
-    print('Enviando mensagem (Resposta)...' + str(resposta) + ' ' + resposta.text +
-          ' - ' + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), flush=True)
-    return resposta
+def notify_new_user(username, email=None):
+    """Notifica cadastro de novo usuário. Retorna True se ao menos um envio funcionou."""
+    config = current_app.config
+    text = ('Prontuário: {}\nNome: {}\nNovo usuário cadastrado: {}'
+            .format(config['FLASKY_PRONTUARIO'], config['FLASKY_NAME'], username))
+    recipients = [config['FLASKY_NOTIFY'], config['FLASKY_ADMIN'], email]
+    # um POST por destinatário: a falha de um endereço não deve impedir os demais
+    results = [send_simple_message(r, 'Novo usuário', text)
+               for r in dict.fromkeys(r for r in recipients if r)]
+    return any(results)
